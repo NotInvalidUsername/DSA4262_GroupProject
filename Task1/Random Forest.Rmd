@@ -1,3 +1,4 @@
+```{r}
 library(dplyr)
 library(pROC)
 library(PRROC)
@@ -5,6 +6,7 @@ library(caret)
 library(ranger)
 library(doParallel)
 library(randomForest)
+```
 
 ## Data
 ```{r}
