@@ -1,0 +1,358 @@
+library(dplyr)
+library(pROC)
+library(PRROC)
+library(caret)
+library(ranger)
+library(doParallel)
+library(randomForest)
+
+## Data
+```{r}
+site_features_full <- read.csv("site_features_full.csv")
+info <- read.csv("info.csv")
+df0_full <- read.csv("train_df_full.csv") # from joining site_features_full and info
+df1_full_no_labels <- read.csv("df1_full_no_labels.csv")
+df2_full_no_labels <- read.csv("df2_full_no_labels.csv")
+```
+
+##Train test split
+```{r}
+##Train test split
+# keep cols for tracking
+unique_genes <- unique(df0_full$gene_id)
+set.seed(42)
+test_genes <- sample(unique_genes, floor(length(unique_genes) * 0.2))
+
+df0_train <- df0_full %>% filter(!gene_id %in% test_genes)
+df0_test  <- df0_full %>% filter(gene_id %in% test_genes)
+
+cat(sprintf("Train genes: %d | Test genes: %d\n",
+            n_distinct(df0_train$gene_id), n_distinct(df0_test$gene_id)))
+
+# Convert label col to numeric 
+df0_train$label <- as.numeric(as.character(df0_train$label))
+df0_test$label  <- as.numeric(as.character(df0_test$label))
+
+# Ensure numeric features (but keep transcript, position, gene_id)
+numeric_cols <- df0_train %>% 
+  select(-label, -transcript, -position, -gene_id) %>%
+  names()
+
+df0_train[, numeric_cols] <- lapply(df0_train[, numeric_cols], function(x) as.numeric(as.character(x)))
+df0_test[, numeric_cols]  <- lapply(df0_test[, numeric_cols],  function(x) as.numeric(as.character(x)))
+
+cat("✅ Train/test split complete. ID columns preserved.\n\n")
+```
+
+## Set seed
+```{r}
+set.seed(42)
+```
+
+##Random forest
+## Version 4
+```{r}
+k <- 5
+n_search <- 30
+
+# Focused around your previous best parameters
+ntree_vals <- sample(700:900, n_search, replace = TRUE)    # around 820
+mtry_vals <- sample(2:3, n_search, replace = TRUE)         # best was 2
+nodesize_vals <- rep(1, n_search)                          # keep deepest trees
+
+# Slightly higher and tighter class weights
+classwt_vals <- runif(n_search, min = 45, max = 70)        # 48.8 was best
+
+# Explore undersampling strength a bit more
+majority_prop_vals <- runif(n_search, min = 0.15, max = 0.50)  # down to 0.15
+
+# Console summary
+cat("REFINED PR-AUC OPTIMIZATION - ROUND 2\n")
+cat(paste0(rep("=", 70), collapse = ""), "\n\n")
+cat("Refinements based on previous results:\n")
+cat("  ✓ Narrowed ntree range around 820 (700–900)\n")
+cat("  ✓ Focused mtry on 2–3 (best was 2)\n")
+cat("  ✓ nodesize fixed at 1 (deep trees)\n")
+cat("  ✓ classwt range 45–70 (higher than 48.8)\n")
+cat("  ✓ majority_prop range 0.15–0.50 (stronger undersampling)\n\n")
+
+cat("Hyperparameter ranges:\n")
+cat(sprintf("  ntree: [%d, %d]\n", min(ntree_vals), max(ntree_vals)))
+cat(sprintf("  mtry: [%d, %d]\n", min(mtry_vals), max(mtry_vals)))
+cat(sprintf("  nodesize: %d\n", unique(nodesize_vals)))
+cat(sprintf("  classwt (positive): [%.1f, %.1f]\n", min(classwt_vals), max(classwt_vals)))
+cat(sprintf("  majority_prop: [%.2f, %.2f]\n\n", min(majority_prop_vals), max(majority_prop_vals)))
+
+# ============================================================================
+# FEATURE ENGINEERING - ADD INTERACTIONS
+# ============================================================================
+cat("Feature engineering with interactions...\n")
+
+# NOW it's safe to exclude these columns
+feature_cols_base <- df0_train %>%
+  select(-label, -transcript, -position, -gene_id) %>%
+  select(where(is.numeric)) %>%
+  names()
+
+# Remove near-zero variance
+x_temp <- df0_train %>% select(all_of(feature_cols_base))
+nzv <- nearZeroVar(x_temp, saveMetrics = TRUE)
+feature_cols_filtered <- feature_cols_base[!nzv$nzv]
+
+cat(sprintf("  Starting features: %d\n", length(feature_cols_base)))
+cat(sprintf("  After NZV removal: %d\n", length(feature_cols_filtered)))
+
+# Quick importance check
+set.seed(42)
+sample_size <- min(3000, nrow(df0_train))
+sample_idx <- sample(nrow(df0_train), sample_size)
+x_sample <- df0_train[sample_idx, ] %>% select(all_of(feature_cols_filtered))
+y_sample <- as.factor(df0_train$label[sample_idx])
+
+quick_rf <- randomForest(
+  x = x_sample, 
+  y = y_sample, 
+  ntree = 826, 
+  mtry = 2,
+  importance = TRUE
+)
+
+importance_df <- data.frame(
+  feature = rownames(quick_rf$importance),
+  importance = quick_rf$importance[, "MeanDecreaseGini"]
+) %>% arrange(desc(importance))
+
+top_features <- head(importance_df$feature, min(8, length(feature_cols_filtered)))
+
+cat("  Top features by importance:\n")
+for (i in 1:min(5, length(top_features))) {
+  cat(sprintf("    %d. %s (%.2f)\n", i, top_features[i], importance_df$importance[i]))
+}
+
+# Add interactions for top features
+interaction_count <- 0
+if (length(top_features) >= 3) {
+  cat("\n  Adding interaction features...\n")
+  for (i in 1:min(4, length(top_features)-1)) {
+    for (j in (i+1):min(5, length(top_features))) {
+      feat1 <- top_features[i]
+      feat2 <- top_features[j]
+      new_feat <- paste0("interact_", i, "_", j)
+      
+      df0_train[[new_feat]] <- 
+        df0_train[[feat1]] * df0_train[[feat2]]
+      
+      feature_cols_filtered <- c(feature_cols_filtered, new_feat)
+      interaction_count <- interaction_count + 1
+    }
+  }
+  cat(sprintf("    Added %d interaction features\n", interaction_count))
+}
+
+# Add squared terms for top 5
+for (i in 1:min(5, length(top_features))) {
+  feat <- top_features[i]
+  new_feat <- paste0(feat, "_sq")
+  df0_train[[new_feat]] <- df0_train[[feat]]^2
+  feature_cols_filtered <- c(feature_cols_filtered, new_feat)
+}
+
+cat(sprintf("  Final feature count: %d\n\n", length(feature_cols_filtered)))
+feature_cols <- feature_cols_filtered
+
+# ============================================================================
+# STRATIFIED GENE-BASED FOLDS (FIXED - NO GENE LEAKAGE)
+# ============================================================================
+cat("\nCreating STRATIFIED gene-based folds...\n")
+
+set.seed(42)
+
+# Get genes with their majority label
+gene_labels <- df0_train %>%
+  group_by(gene_id) %>%
+  summarise(
+    majority_label = as.numeric(mean(label) > 0.5),
+    n_samples = n(),
+    n_positive = sum(label == 1),
+    .groups = 'drop'
+  )
+
+# Separate genes by their majority label
+positive_genes <- gene_labels %>% filter(majority_label == 1) %>% pull(gene_id)
+negative_genes <- gene_labels %>% filter(majority_label == 0) %>% pull(gene_id)
+
+cat(sprintf("  Total genes: %d\n", nrow(gene_labels)))
+cat(sprintf("  Positive-labeled genes: %d (%.1f%%)\n", 
+            length(positive_genes), 100 * length(positive_genes) / nrow(gene_labels)))
+cat(sprintf("  Negative-labeled genes: %d (%.1f%%)\n\n", 
+            length(negative_genes), 100 * length(negative_genes) / nrow(gene_labels)))
+
+# FIXED: Create proper gene-fold assignment
+gene_fold_assignment <- data.frame(
+  gene_id = gene_labels$gene_id,
+  majority_label = gene_labels$majority_label,
+  fold = NA,
+  stringsAsFactors = FALSE
+)
+
+# Assign folds separately for positive and negative genes (stratification)
+if (length(positive_genes) > 0) {
+  pos_idx <- which(gene_fold_assignment$gene_id %in% positive_genes)
+  gene_fold_assignment$fold[pos_idx] <- sample(rep(1:k, length.out = length(pos_idx)))
+}
+
+if (length(negative_genes) > 0) {
+  neg_idx <- which(gene_fold_assignment$gene_id %in% negative_genes)
+  gene_fold_assignment$fold[neg_idx] <- sample(rep(1:k, length.out = length(neg_idx)))
+}
+
+# Map each row to its gene's fold
+folds_balanced_rf <- gene_fold_assignment$fold[match(
+  df0_train$gene_id, 
+  gene_fold_assignment$gene_id
+)]
+
+# VERIFY: NO GENE LEAKAGE
+cat("Verifying NO gene leakage...\n")
+gene_fold_check <- df0_train %>%
+  select(gene_id) %>%
+  mutate(fold = folds_balanced_rf) %>%
+  group_by(gene_id) %>%
+  summarise(
+    n_folds = n_distinct(fold),
+    .groups = 'drop'
+  )
+
+genes_in_multiple_folds <- gene_fold_check %>% filter(n_folds > 1)
+
+if (nrow(genes_in_multiple_folds) > 0) {
+  stop("❌ ERROR: Gene leakage detected! Fix fold assignment.")
+} else {
+  cat("  ✅ SUCCESS: Each gene in exactly ONE fold\n\n")
+}
+
+# Verify stratification
+cat("Fold distribution:\n")
+for (i in 1:k) {
+  genes_in_fold <- unique(df0_train$gene_id[folds_balanced_rf == i])
+  samples_in_fold <- sum(folds_balanced_rf == i)
+  pos_samples <- sum(df0_train$label[folds_balanced_rf == i] == 1)
+  pos_genes <- sum(genes_in_fold %in% positive_genes)
+  
+  cat(sprintf("  Fold %d: %d genes (%d pos), %d samples (%d pos, %.1f%%)\n", 
+              i, length(genes_in_fold), pos_genes, samples_in_fold, 
+              pos_samples, 100 * pos_samples / samples_in_fold))
+}
+cat("\n")
+```    
+                                    
+```{r}
+
+# ============================================================================
+# PARALLEL CROSS-VALIDATION WITH RANGER
+# ============================================================================
+
+n_cores <- max(1, parallel::detectCores())  # leave 1 core free
+cat(sprintf("Detected %d cores — enabling parallel CV (ranger).\n", n_cores))
+cl <- makeCluster(n_cores)
+registerDoParallel(cl)
+
+cv_preds_balanced_rf <- list()
+
+cat(sprintf("Starting optimized Parallel Ranger CV at %s\n", 
+            format(Sys.time(), "%H:%M:%S")))
+
+for (j in 1:n_search) {
+  start <- Sys.time()
+  
+  ntree <- ntree_vals[j]
+  mtry <- mtry_vals[j]
+  nodesize <- nodesize_vals[j]
+  classwt <- classwt_vals[j]
+  majority_prop <- majority_prop_vals[j]
+  
+  cat(sprintf("\n[%2d/%d] ntree=%4d mtry=%d classwt=%.1f maj_prop=%.2f\n", 
+              j, n_search, ntree, mtry, classwt, majority_prop))
+  
+  # Run folds in parallel
+  fold_results <- foreach(
+    i = 1:k,
+    .packages = c("ranger", "dplyr"),
+    .export = c("df0_train", "feature_cols", "folds_balanced_rf")
+  ) %dopar% {
+    set.seed(42 + j * 10 + i)  # reproducible per fold
+    
+    train_idx <- which(folds_balanced_rf != i)
+    test_idx  <- which(folds_balanced_rf == i)
+    
+    train_fold <- df0_train[train_idx, ]
+    test_fold  <- df0_train[test_idx, ]
+    
+    x_train <- train_fold %>% select(all_of(feature_cols))
+    y_train <- as.factor(train_fold$label)
+    x_test  <- test_fold %>% select(all_of(feature_cols))
+    
+    # Class weights
+    class_weights <- c("0" = 1, "1" = classwt)
+    
+    # Sample fraction for minority/majority
+    label_counts <- table(y_train)
+    n_minority <- as.numeric(label_counts["1"])
+    n_majority <- as.numeric(label_counts["0"])
+    
+    # Sample fraction: minority 100%, majority according to majority_prop
+    sample_fraction <- c(
+      "0" = min(1, round(n_majority * majority_prop) / n_majority),
+      "1" = 1
+    )
+    
+    # ---- ranger model ----
+    rf_model <- ranger(
+      dependent.variable.name = "label",
+      data = data.frame(label = y_train, x_train),
+      num.trees = ntree,
+      mtry = mtry,
+      min.node.size = nodesize,
+      class.weights = class_weights,
+      sample.fraction = sample_fraction,
+      replace = TRUE,
+      probability = TRUE,
+      num.threads = 1   # avoid nested parallelism
+    )
+    
+    preds <- predict(rf_model, data = x_test)$predictions[, "1"]
+    
+    data.frame(
+      fold = i,
+      test_idx = test_idx,
+      preds = preds
+    )
+  }
+  
+  # Combine all folds
+  fold_results_df <- bind_rows(fold_results)
+  cv_scores_balanced_rf <- numeric(nrow(df0_train))
+  cv_scores_balanced_rf[fold_results_df$test_idx] <- fold_results_df$preds
+  
+  cv_preds_balanced_rf[[j]] <- data.frame(
+    transcript = df0_train$transcript,
+    position = df0_train$position,
+    gene_id = df0_train$gene_id,
+    label = df0_train$label,
+    score = cv_scores_balanced_rf,
+    ntree = ntree,
+    mtry = mtry,
+    nodesize = nodesize,
+    classwt = classwt,
+    majority_prop = majority_prop
+  )
+  
+  elapsed <- as.numeric(difftime(Sys.time(), start, units = "secs"))
+  cat(sprintf("   Completed in %.1fs (%.1f min)\n", elapsed, elapsed / 60))
+  gc()  # free memory between runs
+}
+
+stopCluster(cl)
+cat(sprintf("\n✅ Parallel Ranger CV completed at %s\n", format(Sys.time(), "%H:%M:%S")))
+```
+                                    
