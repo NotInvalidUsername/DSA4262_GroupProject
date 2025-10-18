@@ -142,4 +142,17 @@ write.csv(dataset_2,
 
 cat("✓ Exported to: df2_full.csv\n")
 
+#Site features full
+write.csv(site_features_full, 
+          file = "site_features_full.csv", 
+          row.names = FALSE)
+
+cat("✓ Exported to: site_features_full.csv\n")
+
+#Info
+write.csv(info, 
+          file = "info.csv", 
+          row.names = FALSE)
+
+cat("✓ Exported to: info.csv\n")
 
