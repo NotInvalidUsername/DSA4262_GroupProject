@@ -247,7 +247,7 @@ full_model <- xgb.train(
 cat("\nFull model training complete\n")
 
 # Save trained model as .xgb
-xgb.save(final_model, "xgboost_full_model_df0.xgb")
+xgb.save(full_model, "xgboost_full_model_df0.xgb")
 cat("Model saved to: xgboost_full_model_df0.xgb\n")
 
 # Generate predictions on df0_full
