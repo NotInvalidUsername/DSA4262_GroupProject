@@ -2,7 +2,7 @@
 # Install any missing packages with dependencies
 # install.packages(setdiff(packages, rownames(installed.packages())), dependencies = TRUE)
 
-# Load Dependencies
+# ======== Load Dependencies ======== 
 library(dplyr)
 library(jsonlite)
 library(xgboost)
@@ -18,7 +18,7 @@ library(UpSetR)
 library(pheatmap)
 library(tidytext)
 
-# Parse json Function
+# ======== Parse json Function ======== 
 parse_m6anet_jsonl <- function(path) {
   message("Starting parse for:", path)
   lines <- readLines(path)
@@ -66,7 +66,7 @@ parse_m6anet_jsonl <- function(path) {
   
 }
 
-# Data Loading & Pre-processing
+# ======== Data Loading & Pre-processing ======== 
 set.seed(42)
 
 ## Load Data
@@ -122,7 +122,7 @@ for (v in varnames) {
 }
 '
 
-# Create Random Forest Pre-processing Features
+#  ======== Create Random Forest Pre-processing Features ======== 
 create_engineered_features <- function(df, top_features) {
   # Add interaction features
   for (i in 1:min(4, length(top_features)-1)) {
@@ -259,6 +259,7 @@ cat("\n Per-cell-line predictions complete. File saved as RF_predictions_task2_m
 # Load Full dataset
 new_data = fread("RF_predictions_task2_master_2.csv")
 
+# ======== Visualisations ======== 
 # distribution of predicted score by reads
 p = ggplot(new_data, aes(x = preds, color = cell_line)) +
   geom_density() +
@@ -375,16 +376,14 @@ p = ggplot(tx_stats, aes(x = mean_score, y = median_score, color = line.x)) +
   geom_abline(slope = 1, intercept = 0, linetype = "dashed")
 ggsave("plots/plot4_3.png", plot = p, width = 6, height = 4, dpi = 300)
 
-# Checking if modifications overlap
+# Checking if modifications overlap via heatmap
 thresh <- 0.6 
 
-# Create per-cell-line lists of modified sites
 calls <- df_mean %>%
   group_by(line.x) %>%
   filter(score >= thresh) %>%
   summarize(mod_sites = list(unique(site_id)), .groups = "drop")
 
-# pairwise Jaccard similarities
 cell_lines <- calls$line.x
 jaccard <- matrix(NA, nrow = length(cell_lines), ncol = length(cell_lines),
                   dimnames = list(cell_lines, cell_lines))
