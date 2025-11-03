@@ -1,4 +1,3 @@
-```{r}
 library(dplyr)
 library(pROC)
 library(PRROC)
@@ -6,21 +5,15 @@ library(caret)
 library(ranger)
 library(doParallel)
 library(randomForest)
-```
 
 ## Data
-```{r}
 site_features_full <- read.csv("site_features_full.csv")
 info <- read.csv("info.csv")
 df0_full <- read.csv("train_df_full.csv") # from joining site_features_full and info
 df1_full_no_labels <- read.csv("df1_full_no_labels.csv")
 df2_full_no_labels <- read.csv("df2_full_no_labels.csv")
-```
 
 ##Train test split
-```{r}
-##Train test split
-# keep cols for tracking
 unique_genes <- unique(df0_full$gene_id)
 set.seed(42)
 test_genes <- sample(unique_genes, floor(length(unique_genes) * 0.2))
@@ -31,11 +24,9 @@ df0_test  <- df0_full %>% filter(gene_id %in% test_genes)
 cat(sprintf("Train genes: %d | Test genes: %d\n",
             n_distinct(df0_train$gene_id), n_distinct(df0_test$gene_id)))
 
-# Convert label col to numeric 
 df0_train$label <- as.numeric(as.character(df0_train$label))
 df0_test$label  <- as.numeric(as.character(df0_test$label))
 
-# Ensure numeric features (but keep transcript, position, gene_id)
 numeric_cols <- df0_train %>% 
   select(-label, -transcript, -position, -gene_id) %>%
   names()
@@ -44,26 +35,22 @@ df0_train[, numeric_cols] <- lapply(df0_train[, numeric_cols], function(x) as.nu
 df0_test[, numeric_cols]  <- lapply(df0_test[, numeric_cols],  function(x) as.numeric(as.character(x)))
 
 cat("✅ Train/test split complete. ID columns preserved.\n\n")
-```
 
 ## Set seed
-```{r}
 set.seed(42)
-```
 
 ##Random forest
 ## Version 4
-```{r}
 k <- 5
 n_search <- 30
 
 # Focused around your previous best parameters
-ntree_vals <- sample(700:900, n_search, replace = TRUE)    # around 820
-mtry_vals <- sample(2:3, n_search, replace = TRUE)         # best was 2
-nodesize_vals <- rep(1, n_search)                          # keep deepest trees
+ntree_vals <- sample(700:900, n_search, replace = TRUE)
+mtry_vals <- sample(2:3, n_search, replace = TRUE)
+nodesize_vals <- rep(1, n_search)
 
 # Slightly higher and tighter class weights
-classwt_vals <- runif(n_search, min = 45, max = 70)        # 48.8 was best
+classwt_vals <- runif(n_search, min = 45, max = 70) 
 
 # Explore undersampling strength a bit more
 majority_prop_vals <- runif(n_search, min = 0.15, max = 0.50)  # down to 0.15
@@ -72,18 +59,18 @@ majority_prop_vals <- runif(n_search, min = 0.15, max = 0.50)  # down to 0.15
 cat("REFINED PR-AUC OPTIMIZATION - ROUND 2\n")
 cat(paste0(rep("=", 70), collapse = ""), "\n\n")
 cat("Refinements based on previous results:\n")
-cat("  ✓ Narrowed ntree range around 820 (700–900)\n")
-cat("  ✓ Focused mtry on 2–3 (best was 2)\n")
-cat("  ✓ nodesize fixed at 1 (deep trees)\n")
-cat("  ✓ classwt range 45–70 (higher than 48.8)\n")
-cat("  ✓ majority_prop range 0.15–0.50 (stronger undersampling)\n\n")
+cat("Narrowed ntree range around 820 (700–900)\n")
+cat("Focused mtry on 2–3 (best was 2)\n")
+cat("nodesize fixed at 1 (deep trees)\n")
+cat("classwt range 45–70 (higher than 48.8)\n")
+cat("majority_prop range 0.15–0.50 (stronger undersampling)\n\n")
 
 cat("Hyperparameter ranges:\n")
-cat(sprintf("  ntree: [%d, %d]\n", min(ntree_vals), max(ntree_vals)))
-cat(sprintf("  mtry: [%d, %d]\n", min(mtry_vals), max(mtry_vals)))
-cat(sprintf("  nodesize: %d\n", unique(nodesize_vals)))
-cat(sprintf("  classwt (positive): [%.1f, %.1f]\n", min(classwt_vals), max(classwt_vals)))
-cat(sprintf("  majority_prop: [%.2f, %.2f]\n\n", min(majority_prop_vals), max(majority_prop_vals)))
+cat(sprintf("ntree: [%d, %d]\n", min(ntree_vals), max(ntree_vals)))
+cat(sprintf("mtry: [%d, %d]\n", min(mtry_vals), max(mtry_vals)))
+cat(sprintf("nodesize: %d\n", unique(nodesize_vals)))
+cat(sprintf("classwt (positive): [%.1f, %.1f]\n", min(classwt_vals), max(classwt_vals)))
+cat(sprintf("majority_prop: [%.2f, %.2f]\n\n", min(majority_prop_vals), max(majority_prop_vals)))
 
 # ============================================================================
 # FEATURE ENGINEERING - ADD INTERACTIONS
@@ -246,15 +233,13 @@ for (i in 1:k) {
               pos_samples, 100 * pos_samples / samples_in_fold))
 }
 cat("\n")
-```    
-                                    
-```{r}
+
 
 # ============================================================================
 # PARALLEL CROSS-VALIDATION WITH RANGER
 # ============================================================================
 
-n_cores <- max(1, parallel::detectCores())  # leave 1 core free
+n_cores <- max(1, parallel::detectCores())
 cat(sprintf("Detected %d cores — enabling parallel CV (ranger).\n", n_cores))
 cl <- makeCluster(n_cores)
 registerDoParallel(cl)
@@ -282,7 +267,7 @@ for (j in 1:n_search) {
     .packages = c("ranger", "dplyr"),
     .export = c("df0_train", "feature_cols", "folds_balanced_rf")
   ) %dopar% {
-    set.seed(42 + j * 10 + i)  # reproducible per fold
+    set.seed(42 + j * 10 + i)  
     
     train_idx <- which(folds_balanced_rf != i)
     test_idx  <- which(folds_balanced_rf == i)
@@ -355,6 +340,331 @@ for (j in 1:n_search) {
 }
 
 stopCluster(cl)
-cat(sprintf("\n✅ Parallel Ranger CV completed at %s\n", format(Sys.time(), "%H:%M:%S")))
-```
-                                    
+cat(sprintf("\nParallel Ranger CV completed at %s\n", format(Sys.time(), "%H:%M:%S")))
+
+# ============================================================================
+# EVALUATE RANGER RESULTS
+# ============================================================================
+cv_results_ranger <- bind_rows(cv_preds_balanced_rf)
+
+# Summarise performance by hyperparameters
+results_summary_ranger <- cv_results_ranger %>%
+  group_by(ntree, mtry, nodesize, classwt, majority_prop) %>%
+  summarise(
+    auc_roc = as.numeric(auc(roc(label, score, quiet = TRUE))),
+    auc_pr = {
+      pr_curve <- pr.curve(
+        scores.class0 = score[label == 1],
+        scores.class1 = score[label == 0],
+        curve = TRUE
+      )
+      pr_curve$auc.integral
+    },
+    auc_combined = (auc_roc + auc_pr) / 2,
+    n_samples = n(),
+    n_genes = n_distinct(gene_id),
+    .groups = 'drop'
+  ) %>%
+  arrange(desc(auc_pr))
+
+cat("\n", paste0(rep("=", 70), collapse = ""), "\n")
+cat("RANGER RESULTS - ALL HYPERPARAMETER COMBINATIONS\n")
+cat(paste0(rep("=", 70), collapse = ""), "\n\n")
+
+cat("All results sorted by PR-AUC:\n\n")
+print(results_summary_ranger %>% 
+      select(ntree, mtry, nodesize, classwt, majority_prop, 
+             auc_roc, auc_pr, auc_combined), n = Inf)
+
+# ============================================================================
+# BEST HYPERPARAMETERS
+# ============================================================================
+cat("\n", paste0(rep("=", 70), collapse = ""), "\n")
+cat("BEST HYPERPARAMETERS\n")
+cat(paste0(rep("=", 70), collapse = ""), "\n\n")
+
+best_by_pr <- results_summary_ranger %>% slice_max(auc_pr, n = 1)
+best_by_roc <- results_summary_ranger %>% slice_max(auc_roc, n = 1)
+best_by_combined <- results_summary_ranger %>% slice_max(auc_combined, n = 1)
+
+cat("Best by PR-AUC (Precision-Recall):\n")
+cat(sprintf("  ntree:          %d\n", best_by_pr$ntree))
+cat(sprintf("  mtry:           %d\n", best_by_pr$mtry))
+cat(sprintf("  nodesize:       %d\n", best_by_pr$nodesize))
+cat(sprintf("  classwt:        %.2f\n", best_by_pr$classwt))
+cat(sprintf("  majority_prop:  %.2f\n", best_by_pr$majority_prop))
+cat(sprintf("  ROC-AUC:        %.6f\n", best_by_pr$auc_roc))
+cat(sprintf("  PR-AUC:         %.6f\n", best_by_pr$auc_pr))
+cat(sprintf("  Combined:       %.6f\n\n", best_by_pr$auc_combined))
+
+cat("Best by ROC-AUC:\n")
+cat(sprintf("  ntree:          %d\n", best_by_roc$ntree))
+cat(sprintf("  mtry:           %d\n", best_by_roc$mtry))
+cat(sprintf("  nodesize:       %d\n", best_by_roc$nodesize))
+cat(sprintf("  classwt:        %.2f\n", best_by_roc$classwt))
+cat(sprintf("  majority_prop:  %.2f\n", best_by_roc$majority_prop))
+cat(sprintf("  ROC-AUC:        %.6f\n", best_by_roc$auc_roc))
+cat(sprintf("  PR-AUC:         %.6f\n", best_by_roc$auc_pr))
+cat(sprintf("  Combined:       %.6f\n\n", best_by_roc$auc_combined))
+
+cat("Best by Combined AUC:\n")
+cat(sprintf("  ntree:          %d\n", best_by_combined$ntree))
+cat(sprintf("  mtry:           %d\n", best_by_combined$mtry))
+cat(sprintf("  nodesize:       %d\n", best_by_combined$nodesize))
+cat(sprintf("  classwt:        %.2f\n", best_by_combined$classwt))
+cat(sprintf("  majority_prop:  %.2f\n", best_by_combined$majority_prop))
+cat(sprintf("  ROC-AUC:        %.6f\n", best_by_combined$auc_roc))
+cat(sprintf("  PR-AUC:         %.6f\n", best_by_combined$auc_pr))
+cat(sprintf("  Combined:       %.6f\n\n", best_by_combined$auc_combined))
+
+# ============================================================================
+# IMPROVEMENT SUMMARY
+# ============================================================================
+cat(paste0(rep("=", 70), collapse = ""), "\n")
+cat("IMPROVEMENT vs BASELINE\n")
+cat(paste0(rep("=", 70), collapse = ""), "\n\n")
+
+cat("Your baseline PR-AUC: 0.297750\n")
+cat(sprintf("New best PR-AUC:      %.6f\n", best_by_pr$auc_pr))
+cat(sprintf("Absolute change:      %+.6f\n", best_by_pr$auc_pr - 0.297750))
+cat(sprintf("Relative change:      %+.1f%%\n\n", 
+            100 * (best_by_pr$auc_pr - 0.297750) / 0.297750))
+
+
+# ============================================================================
+# RECOMMENDATION
+# ============================================================================
+cat(paste0(rep("=", 70), collapse = ""), "\n")
+cat("RECOMMENDED HYPERPARAMETERS\n")
+cat(paste0(rep("=", 70), collapse = ""), "\n\n")
+
+# Choose based on which metric matters most
+if (best_by_pr$auc_pr > 0.30) {
+  cat("Recommendation: Use PR-AUC optimized parameters\n")
+  cat("(PR-AUC > 0.30 indicates good minority class prediction)\n\n")
+  recommended <- best_by_pr
+} else {
+  cat("Recommendation: Use Combined AUC optimized parameters\n")
+  cat("(Balances both ROC-AUC and PR-AUC performance)\n\n")
+  recommended <- best_by_combined
+}
+
+cat("Final parameters:\n")
+cat(sprintf("  ntree:          %d\n", recommended$ntree))
+cat(sprintf("  mtry:           %d\n", recommended$mtry))
+cat(sprintf("  nodesize:       %d\n", recommended$nodesize))
+cat(sprintf("  classwt:        %.2f\n", recommended$classwt))
+cat(sprintf("  majority_prop:  %.2f\n", recommended$majority_prop))
+cat(sprintf("  ROC-AUC:        %.6f\n", recommended$auc_roc))
+cat(sprintf("  PR-AUC:         %.6f\n", recommended$auc_pr))
+
+cat("\nHyperparameter optimization complete!\n")
+
+# Function to create engineered features
+create_engineered_features <- function(df, top_features) {
+  # Add interaction features
+  for (i in 1:min(4, length(top_features)-1)) {
+    for (j in (i+1):min(5, length(top_features))) {
+      feat1 <- top_features[i]
+      feat2 <- top_features[j]
+      new_feat <- paste0("interact_", i, "_", j)
+      
+      if (feat1 %in% names(df) && feat2 %in% names(df)) {
+        df[[new_feat]] <- df[[feat1]] * df[[feat2]]
+      }
+    }
+  }
+  
+  # Add squared terms (ONLY ONCE)
+  for (i in 1:min(5, length(top_features))) {
+    feat <- top_features[i]
+    new_feat <- paste0(feat, "_sq")
+    
+    if (feat %in% names(df) && !endsWith(feat, "_sq")) {  # Don't square already squared features
+      df[[new_feat]] <- df[[feat]]^2
+    }
+  }
+  
+  return(df)
+}
+
+# ============================================================
+# FINAL MODEL TRAINING AND TEST EVALUATION
+# ============================================================
+
+cat("\nTraining final model with recommended parameters...\n")
+set.seed(42)
+
+# Creating model with recommended hyperparameters
+final_model <- ranger(
+  dependent.variable.name = "label",
+  data = train_df %>% select(label, all_of(feature_cols)),
+  num.trees = recommended$ntree,
+  mtry = recommended$mtry,
+  min.node.size = recommended$nodesize,
+  class.weights = c("0" = 1, "1" = recommended$classwt),
+  sample.fraction = c("0" = recommended$majority_prop, "1" = 1),
+  probability = TRUE
+)
+
+cat("Generating predictions on test set...\n")
+
+test_preds <- predict(
+  final_model,
+  data = test_df %>% select(all_of(feature_cols))
+)$predictions[, "1"]
+
+df0_full$label <- as.factor(df0_full$label)
+
+# 1.2 Select only valid predictors (exclude leakage columns)
+feature_cols_base <- df0_full %>%
+  select(-label, -transcript, -position, -gene_id) %>%
+  select(where(is.numeric)) %>%
+  names()
+
+df0_full = create_engineered_features(df0_full, top_features)
+
+feature_cols <- df0_full %>%
+  select(-label, -transcript, -position, -gene_id) %>%
+  names()
+
+set.seed(42)
+df0_full_test <- create_engineered_features(df0_test, top_features)
+
+x_test <- df0_full_test %>% select(all_of(feature_cols))
+y_test <- df0_full_test$label
+
+test_preds <- predict(final_model, data = x_test)$predictions[, "1"]
+
+# ============================================================
+# METRIC EVALUATION ON TEST SET
+# ============================================================
+
+roc_auc <- pROC::auc(pROC::roc(y_test, test_preds))
+pr_auc  <- PRROC::pr.curve(
+  scores.class0 = test_preds[y_test == 1],
+  scores.class1 = test_preds[y_test == 0]
+)$auc.integral
+
+cat(sprintf("\nTest ROC-AUC: %.6f\n", roc_auc))
+cat(sprintf("Test PR-AUC:  %.6f\n", pr_auc))
+
+# Saving final model and hyperparameters
+final_model <- ranger(
+  dependent.variable.name = "label",
+  data = train_df %>% select(label, all_of(feature_cols)),
+  num.trees = recommended$ntree,
+  mtry = recommended$mtry,
+  min.node.size = recommended$nodesize,
+  class.weights = c("0" = 1, "1" = recommended$classwt),
+  sample.fraction = c("0" = recommended$majority_prop, "1" = 1),
+  probability = TRUE
+)
+
+model_bundle <- list(
+  model = final_model,
+  params = list(
+    ntree = recommended$ntree,
+    mtry = recommended$mtry,
+    nodesize = recommended$nodesize,
+    classwt = recommended$classwt,
+    majority_prop = recommended$majority_prop
+  ),
+  features = feature_cols
+)
+
+# hard-coded model bundle
+'# Combine model and its metadata
+model_bundle <- list(
+  model = final_model,
+  params = list(
+    ntree = 771,
+    mtry = 2,
+    nodesize = 1,
+    classwt = 50.91,
+    majority_prop = 0.44
+  ),
+  features = feature_cols
+)
+'
+saveRDS(model_bundle, "final_rf_model_bundle.rds")
+
+cat("Model saved to 'final_rf_model_bundle.rds'\n")
+
+# --- To reload later (recommended params) ---
+bundle <- readRDS("final_rf_model_bundle.rds")
+final_model <- bundle$model
+params <- bundle$params
+feature_cols <- bundle$features
+
+
+# Applying trained model on complete dataset0
+df3_full_no_labels = read.csv("/Users/ryann_/Downloads/df1_full_no_labels.csv")
+names(df3_full_no_labels) <- make.names(names(df3_full_no_labels))
+
+new_data <- create_engineered_features(df3_full_no_labels, top_features)
+
+preds <- predict(final_model,
+                 data = new_data %>% select(all_of(feature_cols)))$predictions[, "1"]
+
+cat("\nModel Ran Successfully.n")
+
+# ============================================================
+# SAVE OUTPUT FOR SUBMISSION
+# ============================================================
+
+submission <- data.frame(
+  transcript_id = new_data$transcript,
+  transcript_position = new_data$position,
+  score = preds
+)
+
+write.csv(submission, file = paste0("/Users/ryann_/Downloads/", "rf_df1_predictions", ".csv"), row.names = FALSE)
+
+write.csv(submission, "rf_df0_predictions.csv", row.names = FALSE, quote = FALSE)
+
+cat("\nFinal model trained and test predictions saved to rf_df0_predictions.csv\n")
+
+# Applying trained model on dataset1
+new_data <- create_engineered_features(df1_full_no_labels, top_features)
+
+preds <- predict(final_model,
+                 data = new_data %>% select(all_of(feature_cols)))$predictions[, "1"]
+
+cat("\n✅ Model Ran Successfully.n")
+
+# ============================================================
+# SAVE OUTPUT FOR SUBMISSION
+# ============================================================
+
+submission <- data.frame(
+  transcript_id = new_data$transcript,
+  transcript_position = new_data$position,
+  probability_score = preds
+)
+
+write.csv(submission, "rf_df1_predictions.csv", row.names = FALSE, quote = FALSE)
+
+cat("\n✅ Final model trained and test predictions saved to rf_df1_predictions.csv\n")
+
+# Applying trained model on dataset2
+new_data <- create_engineered_features(df2_full_no_labels, top_features)
+
+preds <- predict(final_model,
+                 data = new_data %>% select(all_of(feature_cols)))$predictions[, "1"]
+
+cat("\n✅ Model Ran Successfully.n")
+
+# ============================================================
+# SAVE OUTPUT FOR SUBMISSION
+# ============================================================
+
+submission <- data.frame(
+  transcript_id = new_data$transcript,
+  transcript_position = new_data$position,
+  probability_score = preds
+)
+
+write.csv(submission, "rf_df2_predictions.csv", row.names = FALSE, quote = FALSE)
+
+cat("\n✅ Final model trained and test predictions saved to rf_df2_predictions.csv\n")
