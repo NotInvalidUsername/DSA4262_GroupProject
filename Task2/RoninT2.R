@@ -257,176 +257,205 @@ head(merged_data)
 cat("\n Per-cell-line predictions complete. File saved as RF_predictions_task2_master_2.csv\n")
 
 # Load Full dataset
-new_data = fread("RF_predictions_task2_master_2.csv")
+new_data = fread("RF_predictions_task2_master_2.csv") %>%
+  select(-line.y, -replicate.x) %>%
+  rename(line = line.x, replicate = replicate.y)
 
 # ======== Visualisations ======== 
+## Getting an idea of the data
 # distribution of predicted score by reads
 p = ggplot(new_data, aes(x = preds, color = cell_line)) +
   geom_density() +
-  facet_wrap(~ line.x, scales = "free_y") +
+  facet_wrap(~ line, scales = "free_y") +
   labs(
     x = "Predicted m6A probability",
     y = "Density",
     title = "Distribution of predicted m6A probabilities per replicate/run"
   ) +
   theme_classic()
-# Since the plots are very similar to one another, we can use mean.
 
 ggsave("plots/plot1.png", plot = p, width = 6, height = 4, dpi = 300)
 
-# Creating df_mean
-df_mean <- new_data %>%
-  group_by(line.x, transcript, position, site_id) %>%
-  summarize(score = mean(preds), n_rep = n(), .groups = "drop")
-
-# Summary stats
-
-# Identifying top 5 transcripts per cell line
-top_tx <- df_mean %>%
-  group_by(line.x, transcript) %>%
-  summarize(mean_tx_score = median(score, na.rm=TRUE), .groups="drop") %>%
-  group_by(line.x) %>%
-  slice_max(mean_tx_score, n = 5)
-
-p = ggplot(top_tx, aes(x = reorder_within(transcript, mean_tx_score, line.x),
-                       y = mean_tx_score, fill = line.x)) +
-  geom_col(show.legend = FALSE) +
-  facet_wrap(~ line.x, scales="free_y") +
-  scale_x_reordered() +
-  labs(x="Transcript", y="Median m6A probability",
-       title="Top 10 transcripts with highest predicted modification per cell line") +
-  coord_flip() +
-  theme_bw()
-ggsave("plots/plot1_1.png", plot = p, width = 9, height = 6, dpi = 300)
-
-# summary table
-sum_tab <- df_mean %>%
-  group_by(line.x) %>%
-  summarize(
-    n_sites = n(),
-    n_high = sum(score >= 0.6),
-    frac_high = n_high / n_sites,
-    mean_score = mean(score, na.rm = TRUE),
-    median_score = median(score, na.rm = TRUE),
-    p95 = quantile(score, 0.95, na.rm = TRUE),
-    min_score = min(score, na.rm = TRUE),
-    max_score = max(score, na.rm = TRUE),
-    .groups = "drop"
-  )
-
-print(sum_tab)
-
-# density plot
-p = ggplot(df_mean, aes(x = score, fill = line.x, color = line.x)) +
-  geom_density(alpha = 0.3) +
-  labs(
-    x = "Predicted m6A probability (score)",
-    y = "Density",
-    title = "Distribution of m6A site probabilities across cell lines"
+# ======== Distribution of sites per transcript ========
+p = new_data %>%
+  group_by(line, transcript) %>%
+  summarise(n_positions = n(), .groups = "drop") %>%
+  ggplot(aes(x = n_positions, fill = n_positions < 10)) +
+  geom_histogram(bins = 50, color = "black") +
+  scale_fill_manual(
+    values = c("FALSE" = "steelblue", "TRUE" = "tomato"),
+    labels = c("FALSE" = "≥ 10 sites", "TRUE" = "< 10 sites")
   ) +
+  labs(
+    x = "Number of sites per transcript",
+    y = "Count",
+    fill = "Category",
+    title = "Distribution of sites per transcript across cell lines"
+  ) +
+  facet_wrap(~ line, scales = "free_y") +
   theme_classic()
-ggsave("plots/plot2.png", plot = p, width = 6, height = 4, dpi = 300)
+ggsave("plots/plot2.png", plot = p, width = 8, height = 4, dpi = 300)
 
-# Histogram
-p = ggplot(df_mean, aes(x = score, fill = line.x)) +
-  geom_histogram(bins = 50, alpha = 0.5, position = "identity") +
-  facet_wrap(~ line.x, scales = "free_y") +
-  labs(x = "Predicted score", y = "Count") +
-  theme_bw()
+# Filter out transcripts with less than 10 data points 
+new_data <- new_data %>% 
+  group_by(transcript) %>%
+  filter(n() >= 10) %>%
+  ungroup()
+
+# Distribution of data points according to position
+p = ggplot(new_data, aes(x = position)) +
+  geom_density(fill = "steelblue") +
+  labs(
+    x = "Position",
+    y = "Count of data points",
+    title = "Distribution of data point counts by position across cell lines"
+  ) +
+  facet_wrap(~ line, scales = "free_y") +
+  theme_classic()
 ggsave("plots/plot3.png", plot = p, width = 6, height = 4, dpi = 300)
 
-# Boxplot of per-transcript mean scores
-tx_tab <- df_mean %>%
-  group_by(line.x, transcript) %>%
-  summarize(tx_score = mean(score, na.rm = TRUE), .groups = "drop")
+# Scatter plot comparing mean & median
+tx_stats <- new_data %>%
+  group_by(line, position) %>%
+  summarise(mean_score = mean(preds, na.rm = TRUE),
+            median_score = median(preds, na.rm = TRUE),
+            .groups = "drop")
 
-p = ggplot(tx_tab, aes(x = line.x, y = tx_score, fill = line.x)) +
-  geom_boxplot(outlier.alpha = 0.2) +
-  labs(
-    x = "Cell line",
-    y = "Mean transcript-level m6A probability",
-    title = "Distribution of transcript-level m6A scores"
-  ) +
-  theme_classic()
+p = ggplot(tx_stats, aes(x = mean_score, y = median_score, color = line)) +
+  geom_point(alpha = 0.3) +
+  geom_abline(slope = 1, intercept = 0, linetype = "dashed")
 ggsave("plots/plot4.png", plot = p, width = 6, height = 4, dpi = 300)
 
-# Boxplot of per-transcript median scores
-tx_tab <- df_mean %>%
-  group_by(line.x, transcript) %>%
-  summarize(tx_score = median(score, na.rm = TRUE), .groups = "drop")
 
-p = ggplot(tx_tab, aes(x = line.x, y = tx_score, fill = line.x)) +
+df_tx <- new_data %>%
+  group_by(line, transcript) %>%
+  summarise(mid_pred = median(preds, na.rm = TRUE), .groups = "drop")
+
+p = ggplot(df_tx, aes(x = line, y = mid_pred, fill = line)) +
   geom_boxplot(outlier.alpha = 0.2) +
   labs(
     x = "Cell line",
     y = "Median transcript-level m6A probability",
     title = "Distribution of transcript-level m6A scores"
+  )
+ggsave("plots/plot5.png", plot = p, width = 6, height = 4, dpi = 300)
+
+threshold <- 0.6 
+
+rel_abundance <- new_data %>%
+  group_by(line) %>%
+  summarise(
+    total_sites = n(),
+    high_conf_sites = sum(preds >= threshold, na.rm = TRUE)
+  ) %>%
+  mutate(
+    rel_abundance = high_conf_sites / total_sites
+  )
+
+p = ggplot(rel_abundance, aes(x = line, y = rel_abundance, fill = line)) +
+  geom_col(color = "black") +
+  geom_text(aes(label = scales::percent(rel_abundance, accuracy = 0.1)),
+            vjust = -0.5, size = 3.5) +
+  scale_y_continuous(labels = scales::percent_format()) +
+  labs(
+    x = "Cell line",
+    y = "Relative abundance of high-confidence m6A sites",
+    title = "Proportion of high-confidence predicted m6A sites per cell line"
+  ) +
+  theme_classic() +
+  theme(legend.position = "none")
+ggsave("plots/plot6.png", plot = p, width = 6, height = 4, dpi = 300)
+
+
+## This is where results start
+tx_median <- new_data %>%
+  group_by(line, position) %>%
+  summarise(mid_pred = median(preds, na.rm = TRUE), .groups = "drop")
+
+tx_ranked <- tx_median %>%
+  group_by(line) %>%
+  mutate(
+    top_cut = quantile(mid_pred, 0.95, na.rm = TRUE),
+    bot_cut = quantile(mid_pred, 0.05, na.rm = TRUE),
+    group = case_when(
+      mid_pred >= top_cut ~ "Highly modified",
+      mid_pred <= bot_cut ~ "Lowly modified",
+      TRUE ~ NA_character_
+    )
+  ) %>%
+  filter(!is.na(group)) %>%
+  select(line, position, group)
+
+df_binned <- new_data %>%
+  inner_join(tx_ranked, by = c("line", "position")) %>%
+  mutate(bin = cut(position, breaks = 100)) %>%
+  group_by(line, group, bin) %>%
+  summarise(
+    mid_pred = median(preds, na.rm = TRUE),
+    mid_pos = median(as.numeric(sub("\\((.+),.*", "\\1", bin))),
+    .groups = "drop"
+  )
+
+df_summary_all <- df_binned %>%
+  group_by(line, group, bin) %>%
+  summarise(
+    mid_pred = median(mid_pred, na.rm = TRUE),
+    mid_pos = median(mid_pos, na.rm = TRUE),
+    .groups = "drop"
+  )
+
+p = ggplot(df_summary_all, aes(x = mid_pos, y = mid_pred, color = group)) +
+  geom_line(linewidth = 1.1) +
+  facet_wrap(~ line, ncol = 3, scales = "free_y") +
+  labs(
+    x = "Binned position",
+    y = "Median predicted m6A probability",
+    title = "Top vs. bottom 5% modification profiles by cell line"
   ) +
   theme_classic()
-ggsave("plots/plot4_2.png", plot = p, width = 6, height = 4, dpi = 300)
+ggsave("plots/plot7.png", plot = p, width = 6, height = 4, dpi = 300)
 
-# Scatter plot comparing mean & median
-tx_stats <- df_mean %>%
-  group_by(line.x, transcript) %>%
-  summarise(mean_score = mean(score, na.rm = TRUE),
-            median_score = median(score, na.rm = TRUE),
-            .groups = "drop")
-p = ggplot(tx_stats, aes(x = mean_score, y = median_score, color = line.x)) +
-  geom_point(alpha = 0.3) +
-  geom_abline(slope = 1, intercept = 0, linetype = "dashed")
-ggsave("plots/plot4_3.png", plot = p, width = 6, height = 4, dpi = 300)
+# Heatmappie map
+high_sites <- new_data %>%
+  filter(preds >= threshold) %>%
+  select(line, position) %>%
+  distinct()
 
-# Checking if modifications overlap via heatmap
-thresh <- 0.6 
+site_matrix <- high_sites %>%
+  mutate(value = 1) %>%
+  pivot_wider(names_from = line, values_from = value, values_fill = 0)
 
-calls <- df_mean %>%
-  group_by(line.x) %>%
-  filter(score >= thresh) %>%
-  summarize(mod_sites = list(unique(site_id)), .groups = "drop")
+lines <- colnames(site_matrix)[-1]
+jaccard_mat <- matrix(NA, nrow = length(lines), ncol = length(lines),
+                      dimnames = list(lines, lines))
 
-cell_lines <- calls$line.x
-jaccard <- matrix(NA, nrow = length(cell_lines), ncol = length(cell_lines),
-                  dimnames = list(cell_lines, cell_lines))
-
-for (i in seq_along(cell_lines)) {
-  for (j in seq_along(cell_lines)) {
-    A <- calls$mod_sites[[i]]
-    B <- calls$mod_sites[[j]]
-    jaccard[i, j] <- length(intersect(A, B)) / length(union(A, B))
+for (i in lines) {
+  for (j in lines) {
+    a <- site_matrix[[i]]
+    b <- site_matrix[[j]]
+    intersection <- sum(a & b)
+    union <- sum(a | b)
+    jaccard_mat[i, j] <- ifelse(union == 0, NA, intersection / union)
   }
 }
 
-p = pheatmap(jaccard,
-             main = "Jaccard similarity of predicted m6A sites",
-             color = colorRampPalette(c("white","red"))(50))
-ggsave("plots/plot5.png", plot = p, width = 6, height = 4, dpi = 300)
+jaccard_df <- melt(jaccard_mat, varnames = c("Line1", "Line2"), value.name = "Jaccard")
 
-# Median probability scores of a typical transcript
-df_rel <- new_data %>%
-  group_by(transcript) %>%
-  mutate(rel_pos = (position - min(position)) / (max(position) - min(position))) %>%
-  ungroup() %>%
-  filter(!is.na(rel_pos))
-
-df_bins <- df_rel %>%
-  mutate(bin = cut(rel_pos, breaks = seq(0, 1, by = 0.05), include.lowest = TRUE)) %>%
-  group_by(line.x, bin) %>%
-  summarize(mean_score = mean(preds, na.rm = TRUE),
-            median_score = median(preds, na.rm = TRUE),
-            .groups = "drop")
-
-p = ggplot(df_bins, aes(x = as.numeric(bin), y = median_score, color = line.x)) +
-  geom_line(linewidth = 1) +
-  labs(x = "Relative transcript position",
-       y = "Median predicted m6A probability",
-       title = "Positional trend of predicted m6A sites in a typical transcripts") +
-  theme_classic()
-ggsave("plots/plot6.png", plot = p, width = 6, height = 4, dpi = 300)
-
-# Percentage of high-confidence sites (score ≥ 0.6)
-p = ggplot(sum_tab, aes(x = reorder(line.x, -frac_high), y = frac_high, fill = line.x)) +
-  geom_col() +
-  labs(x="Cell line", y="Fraction of high-confidence sites (≥0.6)",
-       title="Relative abundance of predicted m6A sites") +
-  theme_classic()
-ggsave("plots/plot7.png", plot = p, width = 6, height = 4, dpi = 300)
+p = ggplot(jaccard_df, aes(x = Line1, y = Line2, fill = Jaccard)) +
+  geom_tile(color = "white") +
+  geom_text(aes(label = sprintf("%.2f", Jaccard)), size = 3.5, color = "black") +
+  scale_fill_gradient(low = "white", high = "steelblue", na.value = "grey90") +
+  labs(
+    x = "",
+    y = "",
+    fill = "Jaccard\nsimilarity",
+    title = paste("Jaccard similarity of high-confidence (≥", threshold, ") m6A positions")
+  ) +
+  theme_classic() +
+  theme(
+    axis.text.x = element_text(angle = 45, hjust = 1),
+    axis.text = element_text(size = 10),
+    axis.ticks = element_blank(),
+    panel.grid = element_blank()
+  )
+ggsave("plots/plot8.png", plot = p, width = 6, height = 4, dpi = 300)
