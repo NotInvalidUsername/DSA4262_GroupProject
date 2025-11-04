@@ -34,7 +34,7 @@ numeric_cols <- df0_train %>%
 df0_train[, numeric_cols] <- lapply(df0_train[, numeric_cols], function(x) as.numeric(as.character(x)))
 df0_test[, numeric_cols]  <- lapply(df0_test[, numeric_cols],  function(x) as.numeric(as.character(x)))
 
-cat("✅ Train/test split complete. ID columns preserved.\n\n")
+cat("Train/test split complete. ID columns preserved.\n\n")
 
 ## Set seed
 set.seed(42)
@@ -215,9 +215,9 @@ gene_fold_check <- df0_train %>%
 genes_in_multiple_folds <- gene_fold_check %>% filter(n_folds > 1)
 
 if (nrow(genes_in_multiple_folds) > 0) {
-  stop("❌ ERROR: Gene leakage detected! Fix fold assignment.")
+  stop("ERROR: Gene leakage detected! Fix fold assignment.")
 } else {
-  cat("  ✅ SUCCESS: Each gene in exactly ONE fold\n\n")
+  cat("SUCCESS: Each gene in exactly ONE fold\n\n")
 }
 
 # Verify stratification
@@ -631,7 +631,7 @@ new_data <- create_engineered_features(df1_full_no_labels, top_features)
 preds <- predict(final_model,
                  data = new_data %>% select(all_of(feature_cols)))$predictions[, "1"]
 
-cat("\n✅ Model Ran Successfully.n")
+cat("\nModel Ran Successfully.n")
 
 # ============================================================
 # SAVE OUTPUT FOR SUBMISSION
@@ -645,7 +645,7 @@ submission <- data.frame(
 
 write.csv(submission, "rf_df1_predictions.csv", row.names = FALSE, quote = FALSE)
 
-cat("\n✅ Final model trained and test predictions saved to rf_df1_predictions.csv\n")
+cat("\nFinal model trained and test predictions saved to rf_df1_predictions.csv\n")
 
 # Applying trained model on dataset2
 new_data <- create_engineered_features(df2_full_no_labels, top_features)
@@ -653,7 +653,7 @@ new_data <- create_engineered_features(df2_full_no_labels, top_features)
 preds <- predict(final_model,
                  data = new_data %>% select(all_of(feature_cols)))$predictions[, "1"]
 
-cat("\n✅ Model Ran Successfully.n")
+cat("\nModel Ran Successfully.n")
 
 # ============================================================
 # SAVE OUTPUT FOR SUBMISSION
@@ -667,4 +667,4 @@ submission <- data.frame(
 
 write.csv(submission, "rf_df2_predictions.csv", row.names = FALSE, quote = FALSE)
 
-cat("\n✅ Final model trained and test predictions saved to rf_df2_predictions.csv\n")
+cat("\nFinal model trained and test predictions saved to rf_df2_predictions.csv\n")
