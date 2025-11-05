@@ -439,7 +439,7 @@ for (i in lines) {
   }
 }
 
-jaccard_df <- melt(jaccard_mat, varnames = c("Line1", "Line2"), value.name = "Jaccard")
+jaccard_df <- reshape2::melt(jaccard_mat, varnames = c("Line1", "Line2"), value.name = "Jaccard")
 
 p = ggplot(jaccard_df, aes(x = Line1, y = Line2, fill = Jaccard)) +
   geom_tile(color = "white") +
