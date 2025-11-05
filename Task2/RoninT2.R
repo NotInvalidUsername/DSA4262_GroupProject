@@ -298,7 +298,7 @@ ggsave("plots/plot2.png", plot = p, width = 8, height = 4, dpi = 300)
 
 # Filter out transcripts with less than 10 data points 
 new_data <- new_data %>% 
-  group_by(transcript) %>%
+  group_by(line, transcript) %>%
   filter(n() >= 10) %>%
   ungroup()
 
