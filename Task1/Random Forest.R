@@ -9,7 +9,7 @@ library(randomForest)
 ## Data
 site_features_full <- read.csv("site_features_full.csv")
 info <- read.csv("info.csv")
-df0_full <- read.csv("train_df_full.csv") # from joining site_features_full and info
+df0_full <- read.csv("train_df_full.csv")
 df1_full_no_labels <- read.csv("df1_full_no_labels.csv")
 df2_full_no_labels <- read.csv("df2_full_no_labels.csv")
 
@@ -36,7 +36,6 @@ df0_test[, numeric_cols]  <- lapply(df0_test[, numeric_cols],  function(x) as.nu
 
 cat("Train/test split complete. ID columns preserved.\n\n")
 
-## Set seed
 set.seed(42)
 
 ##Random forest
@@ -44,15 +43,12 @@ set.seed(42)
 k <- 5
 n_search <- 30
 
-# Focused around your previous best parameters
 ntree_vals <- sample(700:900, n_search, replace = TRUE)
 mtry_vals <- sample(2:3, n_search, replace = TRUE)
 nodesize_vals <- rep(1, n_search)
 
-# Slightly higher and tighter class weights
 classwt_vals <- runif(n_search, min = 45, max = 70) 
 
-# Explore undersampling strength a bit more
 majority_prop_vals <- runif(n_search, min = 0.15, max = 0.50)  # down to 0.15
 
 # Console summary
@@ -156,7 +152,6 @@ cat("\nCreating STRATIFIED gene-based folds...\n")
 
 set.seed(42)
 
-# Get genes with their majority label
 gene_labels <- df0_train %>%
   group_by(gene_id) %>%
   summarise(
@@ -166,7 +161,6 @@ gene_labels <- df0_train %>%
     .groups = 'drop'
   )
 
-# Separate genes by their majority label
 positive_genes <- gene_labels %>% filter(majority_label == 1) %>% pull(gene_id)
 negative_genes <- gene_labels %>% filter(majority_label == 0) %>% pull(gene_id)
 
@@ -176,7 +170,6 @@ cat(sprintf("  Positive-labeled genes: %d (%.1f%%)\n",
 cat(sprintf("  Negative-labeled genes: %d (%.1f%%)\n\n", 
             length(negative_genes), 100 * length(negative_genes) / nrow(gene_labels)))
 
-# FIXED: Create proper gene-fold assignment
 gene_fold_assignment <- data.frame(
   gene_id = gene_labels$gene_id,
   majority_label = gene_labels$majority_label,
@@ -184,7 +177,7 @@ gene_fold_assignment <- data.frame(
   stringsAsFactors = FALSE
 )
 
-# Assign folds separately for positive and negative genes (stratification)
+# stratification
 if (length(positive_genes) > 0) {
   pos_idx <- which(gene_fold_assignment$gene_id %in% positive_genes)
   gene_fold_assignment$fold[pos_idx] <- sample(rep(1:k, length.out = length(pos_idx)))
@@ -195,13 +188,11 @@ if (length(negative_genes) > 0) {
   gene_fold_assignment$fold[neg_idx] <- sample(rep(1:k, length.out = length(neg_idx)))
 }
 
-# Map each row to its gene's fold
 folds_balanced_rf <- gene_fold_assignment$fold[match(
   df0_train$gene_id, 
   gene_fold_assignment$gene_id
 )]
 
-# VERIFY: NO GENE LEAKAGE
 cat("Verifying NO gene leakage...\n")
 gene_fold_check <- df0_train %>%
   select(gene_id) %>%
@@ -220,7 +211,6 @@ if (nrow(genes_in_multiple_folds) > 0) {
   cat("SUCCESS: Each gene in exactly ONE fold\n\n")
 }
 
-# Verify stratification
 cat("Fold distribution:\n")
 for (i in 1:k) {
   genes_in_fold <- unique(df0_train$gene_id[folds_balanced_rf == i])
@@ -261,7 +251,6 @@ for (j in 1:n_search) {
   cat(sprintf("\n[%2d/%d] ntree=%4d mtry=%d classwt=%.1f maj_prop=%.2f\n", 
               j, n_search, ntree, mtry, classwt, majority_prop))
   
-  # Run folds in parallel
   fold_results <- foreach(
     i = 1:k,
     .packages = c("ranger", "dplyr"),
@@ -279,21 +268,17 @@ for (j in 1:n_search) {
     y_train <- as.factor(train_fold$label)
     x_test  <- test_fold %>% select(all_of(feature_cols))
     
-    # Class weights
     class_weights <- c("0" = 1, "1" = classwt)
     
-    # Sample fraction for minority/majority
     label_counts <- table(y_train)
     n_minority <- as.numeric(label_counts["1"])
     n_majority <- as.numeric(label_counts["0"])
     
-    # Sample fraction: minority 100%, majority according to majority_prop
     sample_fraction <- c(
       "0" = min(1, round(n_majority * majority_prop) / n_majority),
       "1" = 1
     )
     
-    # ---- ranger model ----
     rf_model <- ranger(
       dependent.variable.name = "label",
       data = data.frame(label = y_train, x_train),
@@ -304,7 +289,7 @@ for (j in 1:n_search) {
       sample.fraction = sample_fraction,
       replace = TRUE,
       probability = TRUE,
-      num.threads = 1   # avoid nested parallelism
+      num.threads = 1  
     )
     
     preds <- predict(rf_model, data = x_test)$predictions[, "1"]
@@ -316,7 +301,6 @@ for (j in 1:n_search) {
     )
   }
   
-  # Combine all folds
   fold_results_df <- bind_rows(fold_results)
   cv_scores_balanced_rf <- numeric(nrow(df0_train))
   cv_scores_balanced_rf[fold_results_df$test_idx] <- fold_results_df$preds
@@ -336,7 +320,7 @@ for (j in 1:n_search) {
   
   elapsed <- as.numeric(difftime(Sys.time(), start, units = "secs"))
   cat(sprintf("   Completed in %.1fs (%.1f min)\n", elapsed, elapsed / 60))
-  gc()  # free memory between runs
+  gc()  
 }
 
 stopCluster(cl)
@@ -347,7 +331,6 @@ cat(sprintf("\nParallel Ranger CV completed at %s\n", format(Sys.time(), "%H:%M:
 # ============================================================================
 cv_results_ranger <- bind_rows(cv_preds_balanced_rf)
 
-# Summarise performance by hyperparameters
 results_summary_ranger <- cv_results_ranger %>%
   group_by(ntree, mtry, nodesize, classwt, majority_prop) %>%
   summarise(
@@ -373,8 +356,8 @@ cat(paste0(rep("=", 70), collapse = ""), "\n\n")
 
 cat("All results sorted by PR-AUC:\n\n")
 print(results_summary_ranger %>% 
-      select(ntree, mtry, nodesize, classwt, majority_prop, 
-             auc_roc, auc_pr, auc_combined), n = Inf)
+        select(ntree, mtry, nodesize, classwt, majority_prop, 
+               auc_roc, auc_pr, auc_combined), n = Inf)
 
 # ============================================================================
 # BEST HYPERPARAMETERS
@@ -462,7 +445,6 @@ cat("\nHyperparameter optimization complete!\n")
 
 # Function to create engineered features
 create_engineered_features <- function(df, top_features) {
-  # Add interaction features
   for (i in 1:min(4, length(top_features)-1)) {
     for (j in (i+1):min(5, length(top_features))) {
       feat1 <- top_features[i]
@@ -475,7 +457,6 @@ create_engineered_features <- function(df, top_features) {
     }
   }
   
-  # Add squared terms (ONLY ONCE)
   for (i in 1:min(5, length(top_features))) {
     feat <- top_features[i]
     new_feat <- paste0(feat, "_sq")
@@ -516,7 +497,6 @@ test_preds <- predict(
 
 df0_full$label <- as.factor(df0_full$label)
 
-# 1.2 Select only valid predictors (exclude leakage columns)
 feature_cols_base <- df0_full %>%
   select(-label, -transcript, -position, -gene_id) %>%
   select(where(is.numeric)) %>%
@@ -573,7 +553,7 @@ model_bundle <- list(
   features = feature_cols
 )
 
-# hard-coded model bundle
+# hard-coded model bundle 
 '# Combine model and its metadata
 model_bundle <- list(
   model = final_model,
@@ -598,7 +578,9 @@ params <- bundle$params
 feature_cols <- bundle$features
 
 
-# Applying trained model on complete dataset0
+# ============================================================
+# MODEL APPLICATION OF DATASET2
+# ============================================================
 df3_full_no_labels = read.csv("/Users/ryann_/Downloads/df1_full_no_labels.csv")
 names(df3_full_no_labels) <- make.names(names(df3_full_no_labels))
 
@@ -608,10 +590,6 @@ preds <- predict(final_model,
                  data = new_data %>% select(all_of(feature_cols)))$predictions[, "1"]
 
 cat("\nModel Ran Successfully.n")
-
-# ============================================================
-# SAVE OUTPUT FOR SUBMISSION
-# ============================================================
 
 submission <- data.frame(
   transcript_id = new_data$transcript,
@@ -625,17 +603,15 @@ write.csv(submission, "rf_df0_predictions.csv", row.names = FALSE, quote = FALSE
 
 cat("\nFinal model trained and test predictions saved to rf_df0_predictions.csv\n")
 
-# Applying trained model on dataset1
+# ============================================================
+# MODEL APPLICATION OF DATASET2
+# ============================================================
 new_data <- create_engineered_features(df1_full_no_labels, top_features)
 
 preds <- predict(final_model,
                  data = new_data %>% select(all_of(feature_cols)))$predictions[, "1"]
 
 cat("\nModel Ran Successfully.n")
-
-# ============================================================
-# SAVE OUTPUT FOR SUBMISSION
-# ============================================================
 
 submission <- data.frame(
   transcript_id = new_data$transcript,
@@ -647,17 +623,15 @@ write.csv(submission, "rf_df1_predictions.csv", row.names = FALSE, quote = FALSE
 
 cat("\nFinal model trained and test predictions saved to rf_df1_predictions.csv\n")
 
-# Applying trained model on dataset2
+# ============================================================
+# MODEL APPLICATION OF DATASET2
+# ============================================================
 new_data <- create_engineered_features(df2_full_no_labels, top_features)
 
 preds <- predict(final_model,
                  data = new_data %>% select(all_of(feature_cols)))$predictions[, "1"]
 
 cat("\nModel Ran Successfully.n")
-
-# ============================================================
-# SAVE OUTPUT FOR SUBMISSION
-# ============================================================
 
 submission <- data.frame(
   transcript_id = new_data$transcript,
