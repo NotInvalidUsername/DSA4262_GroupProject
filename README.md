@@ -44,7 +44,7 @@ Prerequisites
 setwd("project/data")
 ```
 
-## Input Files
+### Input Files
 
 Located in project/data:
 ```
@@ -54,9 +54,9 @@ dataset2.json.gz
 dataset3.json.gz
 ```
 
-# Run Instructions
-Option 1 – Full Run (train models from scratch)
-	1.	Parse datasets:
+### Run Instructions
+#### Option 1 – Full Run (train models from scratch)
+1.	Parse datasets:
 ```
 source("Data_Preparation.R")
 ```
@@ -66,7 +66,25 @@ Generates:
 	•	train_df_full.csv
 	•	df1_full_no_labels.csv
 	•	df2_full_no_labels.csv
+	•	df3_full_no_labels.csv
 
+2.	Train Model:
+```
+source("Final_Model_Train.R")
+```
+Outputs saved in project/models/:
+	•	final_rf_model_bundle.rds
+
+3. Apply Model:
+```
+source("Apply_Final_Model.R")
+```
+Outputs saved in project/data/:
+	•	Predicted scores for df0–df3
+
+#### Option 2 – Pretrained Models
+Skip training and use the saved model on `Apply_Final_Model.R`
+	•	../models/final_rf_model_bundle.rds
 
 
 
@@ -75,4 +93,10 @@ Generates:
 
 
 ## Task 2: Applying the model on various cancer cell lines
-1) run the `data_download.sh` to download all the necessary data files to your current working directory. (All data are available in CSV format in the sharepoint folder)
+
+Goal: Apply pretrained models to predict m6A modification probabilities and visualize transcriptomic distributions.
+
+Steps
+	1.	Run the shell script to download all necessary data:
+
+
