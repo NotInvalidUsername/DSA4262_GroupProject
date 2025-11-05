@@ -1,19 +1,9 @@
----
-title: "Untitled"
-author: "Joanne Su"
-date: "2025-10-12"
-output: html_document
----
-
-```{r setup, include=FALSE}
-knitr::opts_chunk$set(echo = TRUE)
-```
 
 ## XGBoost
 
 ### dataset0
 
-```{r Load Libraries & Set Cores}
+# Load Libraries & Set Cores
 # load libraries
 library(dplyr)
 library(xgboost)
@@ -25,20 +15,19 @@ library(parallel)
 num_cores <- parallel::detectCores(logical = TRUE)
 Sys.setenv("OMP_NUM_THREADS" = num_cores)
 message("Using ", num_cores, " CPU threads")
-```
 
 
-```{r Load & Prepare Datasets}
+# Load & Prepare Datasets
 site_features_full <- read.csv("site_features_full.csv")
 info <- read.csv("info.csv")
 df0_full <- read.csv("df0_full.csv") # from joining site_features_full and info
 
 df0_full <- df0_full %>%
   select(-transcript, -position)
-```
+
 
 #### Cross-validation to find best hyperparameters (using df0_train)
-``` {r Split into train & test sets by gene_id}
+# Split into train & test sets by gene_id
 # Split by gene_id
 unique_genes <- unique(df0_full$gene_id)
 set.seed(42)
@@ -62,9 +51,9 @@ df0_test$label  <- as.numeric(as.character(df0_test$label))
 x_cols <- setdiff(names(df0_train), "label")
 df0_train[, x_cols] <- lapply(df0_train[, x_cols], function(x) as.numeric(as.character(x)))
 df0_test[, x_cols]  <- lapply(df0_test[, x_cols],  function(x) as.numeric(as.character(x)))
-```
 
-```{r Define CV parameters & deal with class imbalance}
+
+# Define CV parameters & deal with class imbalance
 n <- nrow(df0_train)
 k <- 5 # number of folds
 n_search <- 50 # number of random hyperparameter searches
@@ -85,9 +74,9 @@ folds <- df0_train %>%
 
 cat(sprintf("Total rows: %d | %d stratified folds | %d random searches\n\n",
             n, k, n_search))
-```
 
-```{r Generate random hyperparameter search grid}
+
+# Generate random hyperparameter search grid
 set.seed(42)
 max_depth_vals <- sample(3:10, n_search, replace = TRUE)
 eta_vals <- runif(n_search, 0.01, 0.2)
@@ -101,9 +90,9 @@ seed_vals <- sample(1:1e6, n_search)
 cv_preds <- list()
 cat(sprintf("Running %d random searches × %d folds\n", n_search, k))
 cat(sprintf("Started at %s\n", format(Sys.time(), "%H:%M:%S")))
-```
 
-```{r Cross-Validation loop pt 1: random search loop}
+
+# Cross-Validation loop pt 1: random search loop
 for (j in 1:n_search) {
   start <- Sys.time()
   
@@ -111,7 +100,6 @@ for (j in 1:n_search) {
   iteration_seed <- seed_vals[j]
   set.seed(iteration_seed)
   
-  # define parameter set for this iteration
   params <- list(
     objective = "binary:logistic",
     eval_metric = "logloss",
@@ -127,9 +115,9 @@ for (j in 1:n_search) {
   
   nrounds <- nrounds_vals[j]
   cv_scores <- numeric(n)
-```
 
-```{r Cross-validation loop pt 2: Inner 5-Fold CV}
+
+# Cross-validation loop pt 2: Inner 5-Fold CV
   for (i in 1:k) {
     train_idx <- which(folds != i)
     test_idx  <- which(folds == i)
@@ -157,9 +145,9 @@ for (j in 1:n_search) {
     preds <- predict(fit, cv_test)
     cv_scores[test_idx] <- preds
   }
-```
 
-```{r Cross-validation loop pt 3}
+
+# Cross-validation loop pt 3
   # store results for each random iteration
   cv_preds[[j]] <- data.frame(
     label = as.numeric(df0_train$label),
@@ -181,9 +169,9 @@ for (j in 1:n_search) {
 
 # combine all CV results
 cv_results <- bind_rows(cv_preds)
-```
 
-```{r Evaluate CV performance, select best model}
+
+# Evaluate CV performance, select best model
 # Pick best hyperparameters from CV
 cv_summary <- cv_results %>%
   group_by(iteration_seed, max_depth, eta, subsample, colsample_bytree, lambda, alpha, nrounds) %>%
@@ -211,9 +199,9 @@ cat("\nBest hyperparameters selected by ROC-AUC:\n")
 print(best_by_roc)
 
 cat("\nCross-validation complete\n")
-```
 
-``` {r Save best params and seeds}
+
+# Save best params and seeds
 best_params <- list(
   objective = "binary:logistic",
   eval_metric = "logloss",
@@ -230,10 +218,10 @@ best_nrounds <- best_by_roc$nrounds
 iteration_seed <- best_by_roc$iteration_seed
 
 set.seed(iteration_seed)  # ensure reproducibility
-```
+
 
 ### Fit model to full dataset0 with best hyperparameters and save model
-```{r}
+
 dtrain_full <- xgb.DMatrix(as.matrix(df0_full[, x_cols]),
                            label = as.numeric(df0_full$label))
 
@@ -263,10 +251,9 @@ output_preds <- df0_with_preds %>%
 
 write.csv(output_preds, "xgboost_predictions_df0.csv", row.names = FALSE)
 cat("Predictions saved to: xgboost_predictions_df0.csv\n")
-```
+
 
 ### Generate predictions for dataset1
-```{r}
 # Load dataset
 df1_full <- read.csv("df1_full_no_labels.csv")
 
@@ -294,10 +281,9 @@ if ("transcript" %in% colnames(df1_full) & "position" %in% colnames(df1_full)) {
 # Save predictions
 write.csv(output_preds_df1, "xgboost_predictions_df1.csv", row.names = FALSE)
 cat("Predictions for df1_full_no_labels saved to xgboost_predictions_df1.csv\n")
-```
+
 
 ### Generate predictions for dataset2
-```{r}
 # Load dataset
 df2_full <- read.csv("df2_full_no_labels.csv")
 
@@ -325,6 +311,6 @@ if ("transcript" %in% colnames(df2_full) & "position" %in% colnames(df2_full)) {
 # Save predictions
 write.csv(output_preds_df2, "xgboost_predictions_df2.csv", row.names = FALSE)
 cat("Predictions for df2_full_no_labels saved to xgboost_predictions_df2.csv\n")
-```
+
 
 
