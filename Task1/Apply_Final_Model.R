@@ -3,6 +3,7 @@ bundle <- readRDS("../models/final_rf_model_bundle.rds")
 final_model <- bundle$model
 params <- bundle$params
 feature_cols <- bundle$features
+top_features  <- read.csv("top_features.csv")[[1]]
 
 
 create_engineered_features <- function(df, top_features) {
