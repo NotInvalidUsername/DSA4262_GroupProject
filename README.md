@@ -89,12 +89,46 @@ Skip training and use the saved model on `Apply_Final_Model.R`
 
 ## Task 2: Applying the model on various cancer cell lines
 
-**Goal**: Apply pretrained models to predict m6A modification probabilities and visualize transcriptomic distributions.
+**Goal**: Apply the trained Random Forest model to predict m6A modification probabilities across multiple cancer cell lines and generate visualisations.
 
-Steps
-	1.	Run the shell script to download all necessary data:
+Prerequisites
+	•	Script: Task2.R
+	•	Language: R
+	•	Working directory:
+	```
+	setwd("project/data")
+	```
+	
+
+### Run Instructions
+1.	Run the shell script to download all necessary data:
 ```
 bash data_download.sh
 ```
+(All required files are also on SharePoint.)
 
+2.	Parse JSONs for all cell lines into CSV format using:
+```
+source("Task2.R")
+```
+This step:
+	•	Reads each cell line JSON file
+	•	Converts it into CSV format
+	•	Uses the pretrained Random Forest model (final_rf_model_bundle.rds) for prediction on each dataset
+3.	The script saves:
+	•	Individual prediction outputs per cell line (*.csv)
+	•	A concatenated master dataset (RF_predictions_task2_master_2.csv)
+	
+4.	The master dataset (RF_predictions_task2_master_2.csv) is then used for:
+	•	Data analysis
+	•	Generating visualisations in data/plots/ (distribution plots, median/mean prediction trends, summary statistics)
+
+#### Outputs
+	
+•	Predictions:
+CSVs for each cancer cell line in data/task2/
+•	Master dataset:
+data/RF_predictions_task2_master_2.csv
+•	Plots:
+Generated in data/plots/
 
