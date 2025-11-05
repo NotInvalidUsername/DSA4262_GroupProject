@@ -1,5 +1,5 @@
 This readme provides instructions on how to run our code. 
-
+```
 Schema:
 project/
 ├── data/                       # **This is the main Working Directory**
@@ -15,7 +15,7 @@ project/
 │   └── *.xgb, *.rds, *.pkl     # Saved model files
 │
 └── README.md                   # Project documentation
-
+```
 
 There are two ways that you can run the code
   1) Running the code and running all functions organically which will take some time to train and run the model.
