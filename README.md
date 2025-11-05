@@ -29,7 +29,7 @@ There are two ways to run this project:
 	1.	Full Run: Execute all scripts sequentially to reproduce model training and data processing (takes longer).
 	2.	Quick Run: Use the preprocessed data and pretrained models available on SharePoint.
 
-SharePoint link: https://nusu-my.sharepoint.com/:f:/g/personal/e0959087_u_nus_edu/Ekxtlk19TDBCs5FGJIc3s_0BNioPh-XZW0uqs6Stvlywfw
+SharePoint link: [Click here](https://nusu-my.sharepoint.com/:f:/g/personal/e0959087_u_nus_edu/Ekxtlk19TDBCs5FGJIc3s_0BNioPh-XZW0uqs6Stvlywfw)
      
 
 ## Task 1: Training the model
