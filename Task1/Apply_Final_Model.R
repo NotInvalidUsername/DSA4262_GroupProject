@@ -1,3 +1,5 @@
+library(ranger)
+library(dplyr)
 
 bundle <- readRDS("../models/final_rf_model_bundle.rds")
 final_model <- bundle$model
