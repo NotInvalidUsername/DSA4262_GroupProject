@@ -36,10 +36,9 @@ SharePoint link: [Click here](https://nusu-my.sharepoint.com/:f:/g/personal/e095
 **Goal**: Train and evaluate Random Forest and XGBoost models on parsed nanopore m6A data.
 
 Prerequisites
-•	Language: R (≥ 4.3)	
-•	Packages: dplyr, ggplot2, xgboost, randomForest, readr, tibble
-
-•	Working directory:
+- Language: R (≥ 4.3)
+- Packages: dplyr, ggplot2, xgboost, randomForest, readr, tibble
+- Working directory:
   
 ```
 setwd("project/data")
@@ -62,30 +61,30 @@ dataset3.json.gz
 source("Data_Preparation.R")
 ```
 Generates:
-•	site_features_full.csv
-•	info.csv
-•	train_df_full.csv
-•	df1_full_no_labels.csv
-•	df2_full_no_labels.csv
-•	df3_full_no_labels.csv
+- site_features_full.csv
+- info.csv
+- train_df_full.csv
+- df1_full_no_labels.csv
+- df2_full_no_labels.csv
+- df3_full_no_labels.csv
 
 2.	Train Model:
 ```
 source("Final_Model_Train.R")
 ```
 Outputs saved in project/models/:
-•	final_rf_model_bundle.rds
+- final_rf_model_bundle.rds
 
 3. Apply Model:
 ```
 source("Apply_Final_Model.R")
 ```
 Outputs saved in project/data/:
-•	Predicted scores for df0–df3
+- Predicted scores for df0–df3
 
 #### Option 2 – Pretrained Models
 Skip training and use the saved model on `Apply_Final_Model.R`
-•	../models/final_rf_model_bundle.rds
+- ../models/final_rf_model_bundle.rds
 
 
 ## Task 2: Applying the model on various cancer cell lines
@@ -93,9 +92,9 @@ Skip training and use the saved model on `Apply_Final_Model.R`
 **Goal**: Apply the trained Random Forest model to predict m6A modification probabilities across multiple cancer cell lines and generate visualisations.
 
 Prerequisites
-•	Script: Task2.R
-•	Language: R
-•	Working directory:	
+- Script: Task2.R
+- Language: R
+- Working directory:	
 ```
 setwd("project/data")
 ```
@@ -114,26 +113,26 @@ bash data_download.sh
 source("Task2.R")
 ```
 This step:
-•	Reads each cell line JSON file (Uses a lot of ram. Might have to parse 1 by 1)
-•	Converts it into CSV format
-•	Uses the pretrained Random Forest model (final_rf_model_bundle.rds) for prediction on each dataset
+- Reads each cell line JSON file (Uses a lot of ram. Might have to parse 1 by 1)
+- Converts it into CSV format
+- Uses the pretrained Random Forest model (final_rf_model_bundle.rds) for prediction on each dataset
 3.	The script saves:
-•	Individual prediction outputs per cell line (*.csv)
-•	A concatenated master dataset (RF_predictions_task2_master_2.csv)
+- Individual prediction outputs per cell line (*.csv)
+- A concatenated master dataset (RF_predictions_task2_master_2.csv)
 	
 4.	The master dataset (RF_predictions_task2_master_2.csv) is then used for:
-•	Data analysis
-•	Generating visualisations in data/plots/ (distribution plots, median/mean prediction trends, summary statistics)
+- Data analysis
+- Generating visualisations in data/plots/ (distribution plots, median/mean prediction trends, summary statistics)
 
 #### Option 2:
 Skip json file parsing and skip to *line 260*
 
 #### Outputs
 	
-•	Predictions:
+- Predictions:
 CSVs for each cancer cell line in data/task2/
-•	Master dataset:
+- Master dataset:
 data/RF_predictions_task2_master_2.csv
-•	Plots:
+- Plots:
 Generated in data/plots/
 
