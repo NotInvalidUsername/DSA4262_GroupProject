@@ -87,16 +87,14 @@ Skip training and use the saved model on `Apply_Final_Model.R`
 	•	../models/final_rf_model_bundle.rds
 
 
-
-
-
-
-
 ## Task 2: Applying the model on various cancer cell lines
 
-Goal: Apply pretrained models to predict m6A modification probabilities and visualize transcriptomic distributions.
+**Goal**: Apply pretrained models to predict m6A modification probabilities and visualize transcriptomic distributions.
 
 Steps
 	1.	Run the shell script to download all necessary data:
+```
+bash data_download.sh
+```
 
 
