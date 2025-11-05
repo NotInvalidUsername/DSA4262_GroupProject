@@ -1,6 +1,12 @@
-This readme provides instructions on how to run our code. 
+# Project Overview
+
+This repository contains all scripts, data, and models used for m6A site prediction and analysis across multiple cancer cell lines.
+It includes two main tasks:
+	1.	Task 1 – Model Training (Random Forest and XGBoost)
+	2.	Task 2 – Applying Trained Models and Visualisation
+
+# Schema:
 ```
-Schema:
 project/
 ├── data/                       # **This is the main Working Directory**
 │   ├── plots/                  # All visualisations for Task 2
@@ -17,17 +23,55 @@ project/
 └── README.md                   # Project documentation
 ```
 
-There are two ways that you can run the code
-  1) Running the code and running all functions organically which will take some time to train and run the model.
-  2) Use the data available on sharepoint where the output of lengthy processes can be found.
-  sharepoint link: https://nusu-my.sharepoint.com/:f:/g/personal/e0959087_u_nus_edu/Ekxtlk19TDBCs5FGJIc3s_0BNioPh-XZW0uqs6Stvlywfw
+# Running the Code
+
+There are two ways to run this project:
+	1.	Full Run: Execute all scripts sequentially to reproduce model training and data processing (takes longer).
+	2.	Quick Run: Use the preprocessed data and pretrained models available on SharePoint.
+
+SharePoint link: https://nusu-my.sharepoint.com/:f:/g/personal/e0959087_u_nus_edu/Ekxtlk19TDBCs5FGJIc3s_0BNioPh-XZW0uqs6Stvlywfw
      
 
 ## Task 1: Training the model
-.
-.
-.
-.
+**Goal**: Train and evaluate Random Forest and XGBoost models on parsed nanopore m6A data.
+
+Prerequisites
+	•	Language: R (≥ 4.3)
+	•	Packages: dplyr, ggplot2, xgboost, randomForest, readr, tibble
+	•	Working directory:
+  
+```
+setwd("project/data")
+```
+
+## Input Files
+
+Located in project/data:
+```
+dataset0.json.gz
+dataset1.json.gz
+dataset2.json.gz
+dataset3.json.gz
+```
+
+# Run Instructions
+Option 1 – Full Run (train models from scratch)
+	1.	Parse datasets:
+```
+source("Data_Preparation.R")
+```
+Generates:
+	•	site_features_full.csv
+	•	info.csv
+	•	train_df_full.csv
+	•	df1_full_no_labels.csv
+	•	df2_full_no_labels.csv
+
+
+
+
+
+
 
 
 ## Task 2: Applying the model on various cancer cell lines
