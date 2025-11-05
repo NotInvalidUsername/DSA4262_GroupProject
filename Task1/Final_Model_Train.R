@@ -566,6 +566,6 @@ model_bundle <- list(
   features = feature_cols
 )
 '
-saveRDS(model_bundle, "final_rf_model_bundle.rds")
+saveRDS(model_bundle, "../models/final_rf_model_bundle.rds")
 
 cat("Model saved to 'final_rf_model_bundle.rds'\n")
