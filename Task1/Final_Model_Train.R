@@ -73,7 +73,6 @@ cat(sprintf("majority_prop: [%.2f, %.2f]\n\n", min(majority_prop_vals), max(majo
 # ============================================================================
 cat("Feature engineering with interactions...\n")
 
-# NOW it's safe to exclude these columns
 feature_cols_base <- df0_train %>%
   select(-label, -transcript, -position, -gene_id) %>%
   select(where(is.numeric)) %>%
