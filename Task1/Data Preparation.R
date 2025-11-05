@@ -113,7 +113,25 @@ dataset_2 <- dataset2 %>%
     .groups = "drop"
   )
 
+##Dataset3
+dataset3 <- parse_m6anet_jsonl_full(
+  "dataset3.json.gz"
+)
 
+dataset_3 <- dataset3 %>% 
+  group_by(transcript, position) %>% 
+  mutate(
+    across(
+      c(starts_with("dwelling_time"), starts_with("stdev"), starts_with("mean_current")),
+      as.numeric
+    )
+  ) %>%
+  summarise(
+    across(starts_with("dwelling_time"), \(x) mean(x, na.rm = TRUE)),
+    across(starts_with("stdev"),        \(x) mean(x, na.rm = TRUE)),
+    across(starts_with("mean_current"), \(x) mean(x, na.rm = TRUE)),
+    .groups = "drop"
+  )
 
 ## Export
 
@@ -151,4 +169,14 @@ write.csv(info,
           row.names = FALSE)
 
 cat("✓ Exported to: info.csv\n")
+
+
+#Dataset3
+write.csv(dataset_3, 
+          file = "df3_full_no_labels.csv", 
+          row.names = FALSE)
+
+cat("✓ Exported to: df3_full.csv\n")
+
+
 
