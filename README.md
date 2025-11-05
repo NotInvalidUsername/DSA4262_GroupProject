@@ -101,6 +101,7 @@ Prerequisites
 	
 
 ### Run Instructions
+#### Option 1 - Full Run
 1.	Run the shell script to download all necessary data:
 ```
 bash data_download.sh
@@ -112,7 +113,7 @@ bash data_download.sh
 source("Task2.R")
 ```
 This step:
-	•	Reads each cell line JSON file
+	•	Reads each cell line JSON file (Uses a lot of ram. Might have to parse 1 by 1)
 	•	Converts it into CSV format
 	•	Uses the pretrained Random Forest model (final_rf_model_bundle.rds) for prediction on each dataset
 3.	The script saves:
@@ -122,6 +123,9 @@ This step:
 4.	The master dataset (RF_predictions_task2_master_2.csv) is then used for:
 	•	Data analysis
 	•	Generating visualisations in data/plots/ (distribution plots, median/mean prediction trends, summary statistics)
+
+#### Option 2:
+Skip json file parsing and skip to *line 260*
 
 #### Outputs
 	
