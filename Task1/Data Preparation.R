@@ -1,13 +1,12 @@
 library(jsonlite)
 library(dplyr)
 
-##Info data
 info <- read.csv("data.info.labelled", stringsAsFactors = FALSE)
 head(info)
 
 ##Dataset0
 parse_m6anet_jsonl_full <- function(path) {
-  lines <- readLines(path)  # read the full file
+  lines <- readLines(path) 
   out <- list()
   idx <- 0L
   
@@ -50,7 +49,7 @@ df_full <- parse_m6anet_jsonl_full(
 )
 
 # Aggregate dataset0
-site_features_full <- df_full %>% #calculating average for each transcript and position
+site_features_full <- df_full %>% 
   group_by(transcript, position) %>% 
   mutate(
     across(
@@ -66,7 +65,6 @@ site_features_full <- df_full %>% #calculating average for each transcript and p
   )
 
 
-# Left join with info to get the labels
 train_df_full <- site_features_full %>% 
   left_join(info,
             by = c("transcript" = "transcript_id",
@@ -77,8 +75,7 @@ dataset1 <- parse_m6anet_jsonl_full(
   "dataset1.json.gz"
 )
 
-### Aggregate dataset1 
-dataset_1 <- dataset1 %>% #calculating average for each transcript and position
+dataset_1 <- dataset1 %>% 
   group_by(transcript, position) %>% 
   mutate(
     across(
@@ -101,8 +98,7 @@ dataset2 <- parse_m6anet_jsonl_full(
   "dataset2.json.gz"
 )
 
-### Aggregate dataset2
-dataset_2 <- dataset2 %>% #calculating average for each transcript and position
+dataset_2 <- dataset2 %>% 
   group_by(transcript, position) %>% 
   mutate(
     across(
