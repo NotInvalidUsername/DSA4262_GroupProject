@@ -2,8 +2,8 @@
 
 This repository contains all scripts, data, and models used for m6A site prediction and analysis across multiple cancer cell lines.
 It includes two main tasks:
-	1.	Task 1 – Model Training (Random Forest and XGBoost)
-	2.	Task 2 – Applying Trained Models and Visualisation
+- Task 1 – Model Training (Random Forest and XGBoost)
+- Task 2 – Applying Trained Models and Visualisation
 
 # Schema:
 ```
@@ -26,11 +26,11 @@ project/
 # Running the Code
 
 There are two ways to run this project:
-	1.	Full Run: Execute all scripts sequentially to reproduce model training and data processing (takes longer).
-	2.	Quick Run: Use the preprocessed data and pretrained models available on SharePoint.
+- Full Run: Execute all scripts sequentially to reproduce model training and data processing (takes longer).
+- Quick Run: Use the preprocessed data and pretrained models available on SharePoint.
 
-Please ensure to select Machine: **M5A.12XLARGE** (Ronin)
-**SharePoint link**: [Click here](https://nusu-my.sharepoint.com/:f:/g/personal/e0959087_u_nus_edu/Ekxtlk19TDBCs5FGJIc3s_0BNioPh-XZW0uqs6Stvlywfw)
+- Please ensure to select Machine: **M5A.12XLARGE** (Ronin)
+- **SharePoint link**: [Click here](https://nusu-my.sharepoint.com/:f:/g/personal/e0959087_u_nus_edu/Ekxtlk19TDBCs5FGJIc3s_0BNioPh-XZW0uqs6Stvlywfw)
      
 
 ## Task 1: Training the model
