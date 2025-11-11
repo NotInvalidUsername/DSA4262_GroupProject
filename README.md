@@ -32,6 +32,16 @@ There are two ways to run this project:
 - Please ensure to select Machine: **M5A.12XLARGE** (Ronin)
 - **SharePoint link**: [Click here](https://nusu-my.sharepoint.com/:f:/g/personal/e0959087_u_nus_edu/Ekxtlk19TDBCs5FGJIc3s_0BNioPh-XZW0uqs6Stvlywfw)
      
+## To install R
+Upon entering your server, run these lines.
+
+```
+sudo apt update
+```
+```
+sudo apt install r-base
+```
+It will take some time. If there is a pop-up, press Enter
 
 ## Task 1: Training the model
 **Goal**: Train and evaluate Random Forest and XGBoost models on parsed nanopore m6A data.
