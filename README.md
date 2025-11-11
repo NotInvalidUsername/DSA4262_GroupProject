@@ -31,7 +31,7 @@ There are two ways to run this project:
 
 - Please ensure to select Machine: **M5A.12XLARGE** (Ronin)
 - **SharePoint link**: [Click here](https://nusu-my.sharepoint.com/:f:/g/personal/e0959087_u_nus_edu/Ekxtlk19TDBCs5FGJIc3s_0BNioPh-XZW0uqs6Stvlywfw)
-- Please refer to the demo in the video presentation if required
+- **Please refer to the demo in the video presentation if required, the demo has more details if you are unsure of how to run the required methods**
      
 ## To install R
 Upon entering your server, run these lines.
@@ -49,7 +49,18 @@ It will take some time. If there is a pop-up, press Enter
 
 Prerequisites
 - Language: R (≥ 4.3)
-- Packages: dplyr, ggplot2, xgboost, randomForest, readr, tibble
+- Packages: 
+```
+install.packages("jsonlite")
+install.packages("dplyr")
+install.packages("pROC")
+install.packages("ranger")
+install.packages("randomForest")
+install.packages("ggplot2")
+install.packages("xgboost")
+install.packages("readr")
+install.packages("tibble")
+```
 - Working directory:
   
 ```
